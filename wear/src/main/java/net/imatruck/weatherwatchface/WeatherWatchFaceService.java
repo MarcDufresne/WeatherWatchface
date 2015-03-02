@@ -6,6 +6,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.Typeface;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -16,6 +17,7 @@ import android.text.format.Time;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.SurfaceHolder;
+import android.view.WindowInsets;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -77,9 +79,18 @@ public class WeatherWatchFaceService extends CanvasWatchFaceService {
 
         boolean mLowBitAmbient;
         boolean mBurnInProtection;
+        boolean mIsRound;
+        int mChinSize;
 
         Paint mTempPaint;
+        Paint mFeelsLikePaint;
         Paint mDegreePaint;
+        Paint mHourPaint;
+        Paint mColonPaint;
+        Paint mMinutePaint;
+        Paint mWeekDayPaint;
+        Paint mDatePaint;
+        Paint mMonthPaint;
 
         String mWeatherCondition = "N/A";
         String mTemperature = "?";
@@ -129,26 +140,61 @@ public class WeatherWatchFaceService extends CanvasWatchFaceService {
             setWatchFaceStyle(new WatchFaceStyle.Builder(WeatherWatchFaceService.this)
                     .setCardPeekMode(WatchFaceStyle.PEEK_MODE_VARIABLE)
                     .setBackgroundVisibility(WatchFaceStyle.BACKGROUND_VISIBILITY_INTERRUPTIVE)
-                    .setShowSystemUiTime(true)
+                    .setShowSystemUiTime(false)
                     .setHotwordIndicatorGravity(Gravity.BOTTOM | Gravity.LEFT)
-                    .setStatusBarGravity(Gravity.TOP | Gravity.RIGHT)
+                    .setStatusBarGravity(Gravity.BOTTOM | Gravity.RIGHT)
                     .setShowUnreadCountIndicator(true)
                     .build());
 
-            /* initialize your watch face */
+            // Temp paints
             mTempPaint = new Paint();
             mTempPaint.setARGB(255, 255, 255, 255);
             mTempPaint.setStrokeWidth(15.0f);
             mTempPaint.setAntiAlias(true);
-            mTempPaint.setTextSize(25f);
+            mTempPaint.setTextSize(35f);
             mTempPaint.setStrokeCap(Paint.Cap.SQUARE);
+            mTempPaint.setTextAlign(Paint.Align.RIGHT);
 
-            mDegreePaint = new Paint();
-            mDegreePaint.setARGB(255, 255, 255, 255);
-            mDegreePaint.setStrokeWidth(15.0f);
-            mDegreePaint.setAntiAlias(true);
-            mDegreePaint.setTextSize(15f);
-            mDegreePaint.setStrokeCap(Paint.Cap.SQUARE);
+            mFeelsLikePaint = new Paint();
+            mFeelsLikePaint.setARGB(255, 255, 255, 255);
+            mFeelsLikePaint.setTextAlign(Paint.Align.RIGHT);
+            mFeelsLikePaint.setAntiAlias(true);
+            mFeelsLikePaint.setTextSize(20f);
+
+
+            // Time paints
+            mHourPaint = new Paint();
+            mHourPaint.setARGB(255, 255, 255, 255);
+            mHourPaint.setStrokeWidth(10.0f);
+            mHourPaint.setAntiAlias(true);
+            mHourPaint.setTextSize(60f);
+            mHourPaint.setStrokeCap(Paint.Cap.ROUND);
+            mHourPaint.setTypeface(Typeface.DEFAULT_BOLD);
+            mHourPaint.setTextAlign(Paint.Align.RIGHT);
+
+            mMinutePaint = new Paint(mHourPaint);
+            mMinutePaint.setTextAlign(Paint.Align.LEFT);
+            mMinutePaint.setTypeface(Typeface.DEFAULT);
+
+            mColonPaint = new Paint(mMinutePaint);
+            mColonPaint.setTextAlign(Paint.Align.CENTER);
+
+            // Date paints
+            mWeekDayPaint = new Paint();
+            mWeekDayPaint.setARGB(255, 255, 255, 255);
+            mWeekDayPaint.setStrokeWidth(15.0f);
+            mWeekDayPaint.setAntiAlias(true);
+            mWeekDayPaint.setTextSize(20f);
+            mWeekDayPaint.setStrokeCap(Paint.Cap.ROUND);
+            mWeekDayPaint.setTextAlign(Paint.Align.RIGHT);
+
+            mMonthPaint = new Paint(mWeekDayPaint);
+            mMonthPaint.setTextAlign(Paint.Align.LEFT);
+
+            mDatePaint = new Paint(mWeekDayPaint);
+            mDatePaint.setTextAlign(Paint.Align.CENTER);
+            mDatePaint.setTypeface(Typeface.DEFAULT_BOLD);
+
 
             mWeatherIcon = BitmapFactory.decodeResource(getResources(), R.drawable.clear_day);
 
@@ -172,6 +218,13 @@ public class WeatherWatchFaceService extends CanvasWatchFaceService {
             super.onPropertiesChanged(properties);
             mLowBitAmbient = properties.getBoolean(PROPERTY_LOW_BIT_AMBIENT, false);
             mBurnInProtection = properties.getBoolean(PROPERTY_BURN_IN_PROTECTION, false);
+        }
+
+        @Override
+        public void onApplyWindowInsets(WindowInsets insets){
+            super.onApplyWindowInsets(insets);
+            mIsRound = insets.isRound();
+            mChinSize = insets.getSystemWindowInsetBottom();
         }
 
         @Override
@@ -210,33 +263,56 @@ public class WeatherWatchFaceService extends CanvasWatchFaceService {
         @Override
         public void onDraw(Canvas canvas, Rect bounds) {
             Log.d(TAG, "onDraw");
-            /* draw your watch face */
-            float x = 34f;
-            float y = 120f;
 
+            final float center_x = canvas.getWidth() / 2;
+            final int canvas_height = canvas.getHeight();
+
+            // Draw Background
             if (isInAmbientMode()){
                 canvas.drawColor(Color.BLACK);
             } else {
                 canvas.drawColor(getBackgroundColor());
             }
 
-            float icon_y = (32f - mWeatherIcon.getHeight()) / 2f + 95f;
+            // Draw Time
+            String hourString = mTime.format("%H");
+            String colonString = ":";
+            String minuteString = mTime.format("%M");
 
-            canvas.drawBitmap(mWeatherIcon, x, icon_y, mTempPaint);
+            float colonLength = mColonPaint.measureText(colonString);
 
-            x += 38f;
+            float time_y = canvas_height * 0.25f;
 
-            canvas.drawText(mTemperature, x, y, mTempPaint);
+            canvas.drawText(colonString, center_x, time_y, mColonPaint);
+            canvas.drawText(hourString, center_x - colonLength / 2, time_y, mHourPaint);
+            canvas.drawText(minuteString, center_x + colonLength / 2, time_y, mMinutePaint);
 
-            x += mTempPaint.measureText(mTemperature) + 5f;
-            y -= 7f;
+            // Draw date
+            String dayOfWeekString = mTime.format("%a ");
+            String dateString = mTime.format("%d");
+            String monthString = mTime.format(" %b");
+
+            float dateLength = mDatePaint.measureText(dateString);
+
+            float date_y = canvas_height * 0.35f;
+
+            canvas.drawText(dateString, center_x, date_y, mDatePaint);
+            canvas.drawText(dayOfWeekString, center_x - dateLength / 2, date_y, mWeekDayPaint);
+            canvas.drawText(monthString, center_x + dateLength / 2, date_y, mMonthPaint);
+
+            // Draw current weather
+            float temp_y = canvas_height * 0.525f;
+            float feelLike_y = temp_y + canvas_height * 0.075f;
+
+            float spaceLength = mTempPaint.measureText(" ");
+
+            canvas.drawBitmap(mWeatherIcon, center_x + spaceLength, temp_y - mWeatherIcon.getHeight(), mTempPaint);
+
+            canvas.drawText(mTemperature + "° ", center_x, temp_y, mTempPaint);
 
             if (!mFeelsLikeTemp.equals(mTemperature)) {
-                canvas.drawText(mFeelsLikeTemp, x, y, mDegreePaint);
-                x += mDegreePaint.measureText(mFeelsLikeTemp) + 5f;
+                canvas.drawText(mFeelsLikeTemp + "°", center_x - spaceLength, feelLike_y, mFeelsLikePaint);
             }
-
-            canvas.drawText("°C", x, y, mDegreePaint);
 
             Log.d(TAG, "onDraw Done");
 
@@ -292,10 +368,10 @@ public class WeatherWatchFaceService extends CanvasWatchFaceService {
                         long sunriseTime = dataMap.getLong(WeatherWatchFaceConstants.KEY_WEATHER_SUNRISE, -1);
 
                         Log.d(TAG, "Received weather from mobile: " + icon + ", " + temp);
-                        if (!mWeatherCondition.equals(icon))
+                        if (!mWeatherCondition.equals(icon)) {
                             mWeatherCondition = icon;
                             mWeatherIcon = BitmapFactory.decodeResource(getResources(), getWeatherIconResourceId());
-
+                        }
                         mTemperature = temp;
                         mFeelsLikeTemp = feelsLike;
                         long currentTime = mTime.toMillis(false) / 1000;
