@@ -2,7 +2,7 @@
 
 This watch face displays weather info from ForecastIO on your Android Wear device.
 
-This is an experiment with the Android Wear Watch Face API. Currently supports only the LG G Watch, will work on other watches but weather info might be out of place a bit.
+This is an experiment with the Android Wear Watch Face API. Currently tested only on square watches but should work fine with round ones.
 
 This repo contains 3 projects:
 
